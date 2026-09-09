@@ -36,8 +36,8 @@ Requires Python 3.11+ with SQLite FTS5 (the note search uses it; the app checks
 at startup and tells you if it is missing).
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/trading-journal.git
-cd trading-journal
+git clone https://github.com/jfitzflynn22/Trading-Journal.git
+cd Trading-Journal
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/streamlit run app.py
