@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Trading Journal</string>
+    <key>CFBundleDisplayName</key>
+    <string>Trading Journal</string>
+    <key>CFBundleExecutable</key>
+    <string>TradingJournal</string>
+    <key>CFBundleIdentifier</key>
+    <string>local.tradingjournal.launcher</string>
+    <!-- Contents/Resources/AppIcon.icns, built by bin/make-icon.py -->
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <!-- The launcher is a shell script that lives only to babysit the server,
+         so it stays out of the Dock and the menu bar: the Chrome app window it
+         opens is what the user sees and switches to. Without this there would
+         be two Dock tiles for one window. -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+</dict>
+</plist>

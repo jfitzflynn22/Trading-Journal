@@ -1,0 +1,69 @@
+# Two palettes, switched at runtime by the sidebar toggle (views/theme.py).
+#
+# Nothing colour-related may live under [theme] itself: a top-level key wins
+# over both variants, which is what previously kept the app dark even when
+# Streamlit was asked for light. Only genuinely shared settings go there.
+#
+# These drive Streamlit's own chrome *and* the dataframe grids, which render to
+# <canvas> and so cannot be reached by CSS -- that is the whole reason the
+# toggle switches the real Streamlit theme rather than just restyling.
+[theme]
+font = "sans serif"
+# NB: showSidebarBorder was tried here and draws nothing in this layout --
+# no border lands on the section, the content, or a pseudo-element. The seam
+# hairline is drawn in views/theme.py instead.
+
+# Google's Material dark, as on the Search history / My Activity pages.
+# Strictly neutral greys -- no warm or cool cast in any of them. The panel and
+# border greys in views/theme.py are the matching neutral ramp.
+[theme.dark]
+primaryColor = "#22c55e"
+backgroundColor = "#1f1f1f"
+# Input fills, and the one reason they differ from backgroundColor: with the
+# two equal, every field on the New Trade form was the same colour as the form
+# behind it and read as nothing at all. A step down mirrors light mode, where
+# the fields (#f0eee6) sit just under the page (#faf9f5).
+secondaryBackgroundColor = "#171717"
+textColor = "#e8eaed"
+# The grids are <canvas>, so these two are the only way to bring them into the
+# palette -- left at Streamlit's defaults their header reads cool blue against
+# the cards. Keep in step with card_2/edge in views/theme.py.
+dataframeHeaderBackgroundColor = "#37393b"
+dataframeBorderColor = "#444746"
+
+# The sidebar sits one plane *below* the page rather than above it, so the
+# panels stay the brightest surfaces and keep reading as the raised, content-
+# bearing layer. Light mode already works this way (its sidebar is deeper than
+# its page), so this keeps one story across both.
+#
+# This has to be the sidebar-specific token, NOT secondaryBackgroundColor:
+# that one also paints the form-field fills in the main area, so darkening it
+# globally would sink every input on the New Trade page below the page ground.
+# Keep in step with sidebar_bg in views/theme.py, which backs the pinned
+# appearance toggle.
+[theme.dark.sidebar]
+backgroundColor = "#171717"
+# Pinned, not inherited. The sidebar sits a plane lower than the page, so the
+# darker main-area fill above would land on exactly the sidebar's own colour
+# and make its filter fields disappear. Fields here go the other way -- a step
+# up from the sidebar rather than down from the page.
+secondaryBackgroundColor = "#1f1f1f"
+
+# Claude's light mode: warm cream ground, near-black warm text.
+[theme.light]
+primaryColor = "#22c55e"
+backgroundColor = "#faf9f5"
+secondaryBackgroundColor = "#f0eee6"
+textColor = "#1f1e1d"
+dataframeHeaderBackgroundColor = "#f0eee6"
+dataframeBorderColor = "#e3e0d6"
+
+[server]
+headless = true
+# Rerun on save instead of showing the "Source file changed" prompt. Note this
+# only reruns the script: edits to imported modules (views/*.py) still need the
+# server restarted before they take effect.
+runOnSave = true
+
+[browser]
+gatherUsageStats = false

@@ -1,0 +1,29 @@
+# Your journal. Never commit this -- it is your trading record.
+journal.db
+journal.db-wal
+journal.db-shm
+*.db.bak-*
+
+# Generated demo data (rebuild it with bin/make-demo-data.py)
+demo.db
+demo.db-wal
+demo.db-shm
+
+# Screenshots you upload against trades
+media/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Build products: the launcher binary, the icon set, the icon helper.
+# Their sources are committed; run bin/build-launcher.sh and bin/make-icon.py.
+build/
+bin/set-icon
+Trading Journal.app/Contents/MacOS/
+Trading Journal.app/Contents/Resources/
+Trading Journal.app/Contents/_CodeSignature/
+
+# macOS
+.DS_Store
