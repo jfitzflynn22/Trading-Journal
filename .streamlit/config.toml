@@ -60,6 +60,14 @@ dataframeBorderColor = "#e3e0d6"
 
 [server]
 headless = true
+# Loopback only, so the journal is reachable from this machine and nowhere else.
+# Without it Streamlit listens on every interface, which puts the whole journal
+# -- every note and psyche entry -- on a page anyone on the same network can
+# open and edit, with no login in front of it.
+#
+# Serving it to a phone or another computer would need this widened AND a
+# password in front of it. Do not widen it on its own.
+address = "localhost"
 # Rerun on save instead of showing the "Source file changed" prompt. Note this
 # only reruns the script: edits to imported modules (views/*.py) still need the
 # server restarted before they take effect.

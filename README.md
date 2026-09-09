@@ -8,6 +8,15 @@ equity curve. A win is your planned R:R, a loss is −1R, a breakeven is 0R. The
 point is to review the *inputs* — the setup, the time of day, the state you were
 in — rather than watching a balance.
 
+> **Early development.** This works and is in daily use, but it is a personal
+> tool being built in the open. Expect rough edges, and expect things to change.
+>
+> **One device, one person.** The server binds to `localhost`, so the journal is
+> reachable only from the machine running it — not from your phone, not from
+> another computer, not from the internet. There is no login, no accounts and no
+> multi-user support, and until there is, opening it up would mean serving your
+> journal to anyone on the same network. That is deliberate, not an oversight.
+>
 > **The screenshots below use generated fake data.** Every trade in them came
 > out of `bin/make-demo-data.py`. Nothing here is anyone's real trading record.
 
@@ -43,9 +52,13 @@ python3 -m venv .venv
 .venv/bin/streamlit run app.py
 ```
 
-Open http://localhost:8501. The database creates itself on first run — schema,
-plus the confluence, draw-on-liquidity and entry-model vocabularies, already
-populated. You start with an empty journal and a full set of tags.
+Open http://localhost:8501 — that address means *your own machine*, whichever
+machine you run it on. Nothing is published and no server of anyone else's is
+involved.
+
+The database creates itself on first run — schema, plus the confluence,
+draw-on-liquidity and entry-model vocabularies, already populated. You start
+with an empty journal and a full set of tags.
 
 Optional, so it greets you by name:
 
@@ -119,10 +132,14 @@ window. Both are macOS-only and neither is needed to use the journal.
 
 ## Notes
 
-This is a personal tool published in case it is useful, not a product. There is
-no auth, no multi-user support and no server component — it assumes one person
-on one machine, which is why the database is a file and the app binds to
-localhost.
+This is a personal tool published in case it is useful, not a product, and it is
+early. There is no auth and no multi-user support: it assumes one person on one
+machine, which is why the database is a single file and why `.streamlit/config.toml`
+pins `server.address` to `localhost`.
+
+Widening that to reach the app from another device would expose an unauthenticated
+journal to everyone on the network. If you need that, put a password in front of
+it first.
 
 Not financial advice, and not a broker integration: nothing here connects to an
 account or places an order.
