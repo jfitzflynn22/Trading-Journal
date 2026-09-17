@@ -20,7 +20,7 @@ DEFAULT_DB = Path(os.environ.get("JOURNAL_DB") or (ROOT / "journal.db")).expandu
 SCHEMA_SQL = ROOT / "schema.sql"
 SEEDS_SQL = ROOT / "seeds.sql"
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # The chip palette. Named here once so a colour is changed in a single place.
 PALETTE = {
@@ -56,6 +56,7 @@ TAG_COLORS: dict[str, dict[str, str]] = {
         "5m FVG": "red", "15m FVG": "red", "30m FVG": "red", "1hr FVG": "red",
         "2hr FVG": "red", "4hr FVG": "red", "Daily FVG": "red",
         "10m FVG": "red",          # pre-existing, used by 1 trade; inferred red
+        "Equilibrium/OTE": "blue",
         "LTF SMT": "green", "HTF SMT": "green",
     },
     "dol": {
@@ -128,6 +129,52 @@ def _apply_palette(conn: sqlite3.Connection) -> None:
 
         # Anything the palette missed keeps a readable default rather than none.
         conn.execute("UPDATE tag SET color = ? WHERE color IS NULL", (PALETTE["grey"],))
+
+
+# v4 vocabulary additions: (kind, name, family, the tag to place it after).
+# Anchored to a neighbour rather than to a number, because sort_order in an
+# existing database has usually drifted from seeds.sql -- reordering the pickers
+# is a supported thing to do, so the literal seed positions cannot be assumed.
+_V4_TAGS = [
+    ("confluence", "Equilibrium/OTE", None, "Daily FVG"),
+]
+
+
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    """Add Equilibrium/OTE to the confluence vocabulary, after Daily FVG.
+
+    New tags have so far been appended (NEW_TAGS, above), which needs no
+    renumbering. This one goes into the middle of the list, and sort_order is
+    dense -- there is no gap to slot into -- so everything from the insertion
+    point onward shifts up by one. Nothing joins on sort_order; it is read only
+    by the ORDER BY that builds the pickers.
+    """
+    with conn:
+        for kind, name, family, after in _V4_TAGS:
+            if conn.execute("SELECT 1 FROM tag WHERE kind = ? AND name = ?",
+                            (kind, name)).fetchone():
+                continue  # already present: re-running must not duplicate it
+
+            anchor = conn.execute("SELECT sort_order FROM tag WHERE kind = ? AND name = ?",
+                                  (kind, after)).fetchone()
+            if anchor is None:
+                # The anchor was renamed or removed. Append rather than guess at
+                # a position in a vocabulary someone has edited.
+                position = conn.execute(
+                    "SELECT COALESCE(max(sort_order), 0) + 1 FROM tag WHERE kind = ?",
+                    (kind,)).fetchone()[0]
+            else:
+                position = anchor[0] + 1
+                conn.execute(
+                    "UPDATE tag SET sort_order = sort_order + 1 WHERE kind = ? AND sort_order >= ?",
+                    (kind, position),
+                )
+
+            conn.execute(
+                "INSERT INTO tag (kind, name, family, sort_order, color) VALUES (?,?,?,?,?)",
+                (kind, name, family, position, PALETTE[TAG_COLORS[kind][name]]),
+            )
+
 
 # v2: drop trade.be_reason. It appears in a CHECK constraint, and SQLite
 # refuses ALTER TABLE DROP COLUMN on a column a constraint references, so the
@@ -286,6 +333,12 @@ def migrate(conn: sqlite3.Connection, *, seed: bool = True) -> int:
         with conn:
             conn.execute("PRAGMA user_version = 3")
         current = 3
+
+    if current == 3:
+        _migrate_v4(conn)
+        with conn:
+            conn.execute("PRAGMA user_version = 4")
+        current = 4
 
     return user_version(conn)
 

@@ -6,18 +6,24 @@
 -- tags later with SQL against the `tag` table -- nothing in the app hardcodes
 -- these names. `family` rolls timeframe variants (5m FVG, 15m FVG, ...) into one
 -- bucket so per-tag breakdowns reach a usable sample size sooner.
+--
+-- sort_order is dense, so slotting a tag into the middle means renumbering the
+-- ones after it. journal/db.py does that for databases that already exist; this
+-- file is only read when a new one is created.
 
 INSERT INTO tag (kind, name, family, sort_order, description) VALUES
   ('confluence', 'po3',               NULL,  1, NULL),
-  ('confluence', 'HTF SMT',           'SMT', 2, NULL),
-  ('confluence', '5m FVG',            'FVG', 3, NULL),
+  ('confluence', '5m FVG',            'FVG', 2, NULL),
+  ('confluence', '10m FVG',           'FVG', 3, NULL),
   ('confluence', '15m FVG',           'FVG', 4, NULL),
-  ('confluence', 'LTF SMT',           'SMT', 5, NULL),
-  ('confluence', '30m FVG',           'FVG', 6, NULL),
-  ('confluence', '4hr FVG',           'FVG', 7, NULL),
-  ('confluence', '1hr FVG',           'FVG', 8, NULL),
-  ('confluence', '2hr FVG',           'FVG', 9, NULL),
-  ('confluence', '10m FVG',           'FVG', 10, NULL),
+  ('confluence', '30m FVG',           'FVG', 5, NULL),
+  ('confluence', '1hr FVG',           'FVG', 6, NULL),
+  ('confluence', '2hr FVG',           'FVG', 7, NULL),
+  ('confluence', '4hr FVG',           'FVG', 8, NULL),
+  ('confluence', 'Daily FVG',         'FVG', 9, NULL),
+  ('confluence', 'Equilibrium/OTE',   NULL, 10, NULL),
+  ('confluence', 'LTF SMT',           'SMT', 11, NULL),
+  ('confluence', 'HTF SMT',           'SMT', 12, NULL),
 
   ('dol', 'HTF DOL',           NULL, 1, NULL),
   ('dol', 'ERL',               NULL, 2, NULL),
