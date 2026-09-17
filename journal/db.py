@@ -20,7 +20,7 @@ DEFAULT_DB = Path(os.environ.get("JOURNAL_DB") or (ROOT / "journal.db")).expandu
 SCHEMA_SQL = ROOT / "schema.sql"
 SEEDS_SQL = ROOT / "seeds.sql"
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # The chip palette. Named here once so a colour is changed in a single place.
 PALETTE = {
@@ -56,7 +56,7 @@ TAG_COLORS: dict[str, dict[str, str]] = {
         "5m FVG": "red", "15m FVG": "red", "30m FVG": "red", "1hr FVG": "red",
         "2hr FVG": "red", "4hr FVG": "red", "Daily FVG": "red",
         "10m FVG": "red",          # pre-existing, used by 1 trade; inferred red
-        "Equilibrium/OTE": "blue",
+        "Equilibrium/OTE": "magenta",
         "LTF SMT": "green", "HTF SMT": "green",
     },
     "dol": {
@@ -174,6 +174,24 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
                 "INSERT INTO tag (kind, name, family, sort_order, color) VALUES (?,?,?,?,?)",
                 (kind, name, family, position, PALETTE[TAG_COLORS[kind][name]]),
             )
+
+
+# v5: tags whose colour in TAG_COLORS has changed since it was written to the
+# database. The palette is applied once -- at v2->v3, on a fresh database, or
+# when a tag is inserted -- and tag.color keeps whatever it was given, so
+# editing the table above is not by itself enough to recolour a chip that
+# already exists.
+_V5_RECOLOURED = [
+    ("confluence", "Equilibrium/OTE"),
+]
+
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """Re-point the chips whose palette entry has changed."""
+    with conn:
+        for kind, name in _V5_RECOLOURED:
+            conn.execute("UPDATE tag SET color = ? WHERE kind = ? AND name = ?",
+                         (PALETTE[TAG_COLORS[kind][name]], kind, name))
 
 
 # v2: drop trade.be_reason. It appears in a CHECK constraint, and SQLite
@@ -339,6 +357,12 @@ def migrate(conn: sqlite3.Connection, *, seed: bool = True) -> int:
         with conn:
             conn.execute("PRAGMA user_version = 4")
         current = 4
+
+    if current == 4:
+        _migrate_v5(conn)
+        with conn:
+            conn.execute("PRAGMA user_version = 5")
+        current = 5
 
     return user_version(conn)
 
