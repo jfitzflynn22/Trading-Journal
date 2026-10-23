@@ -316,6 +316,103 @@ def _css(mode_name: str) -> str:
   [class*="st-key-shot_"] [data-testid="stImage"] {{
     margin-bottom: 0 !important;
   }}
+  /* Expand-screenshot button: laid over the whole picture and invisible, so
+     clicking anywhere on the image opens it. It sits under the ✕ (z-index 3),
+     which keeps its own corner. The label stays in the markup for screen
+     readers; only its paint is removed. */
+  [class*="st-key-shot_"] [class*="st-key-zoom_"] {{
+    position: absolute;
+    inset: 0;
+    width: auto !important;
+    z-index: 2;
+  }}
+  [class*="st-key-zoom_"] [data-testid="stButton"],
+  [class*="st-key-zoom_"] [data-testid="stButton"] > *,
+  [class*="st-key-zoom_"] button {{
+    width: 100% !important;
+    height: 100% !important;
+  }}
+  [class*="st-key-zoom_"] button {{
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: transparent !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    cursor: zoom-in !important;
+  }}
+  [class*="st-key-zoom_"] button:focus-visible {{
+    outline: 2px solid rgba(255,255,255,.7) !important;
+    outline-offset: -2px;
+  }}
+
+  /* The enlarged screenshot. A fixed container centred by inset + auto
+     margins rather than by a transform: a transform would become the
+     containing block for the fixed backdrop below and shrink it to the size
+     of the picture. Above Streamlit's header (z-index 999990) and sidebar. */
+  .st-key-lightbox {{
+    position: fixed !important;
+    inset: 0;
+    margin: auto;
+    width: fit-content !important;
+    height: fit-content !important;
+    gap: 0 !important;
+    z-index: 1000100;
+  }}
+  /* The dimmed page behind it. Also takes the clicks, so nothing under the
+     overlay can be changed while a picture is open. */
+  .st-key-lightbox::before {{
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.82);
+    z-index: -1;
+  }}
+  /* Streamlit sizes the image's wrappers to the width it was given -- here
+     the file's full pixel width, several thousand px -- so they are released
+     to wrap the picture at its displayed size instead. */
+  .st-key-lightbox [data-testid="stImage"],
+  .st-key-lightbox [data-testid="stImage"] * {{
+    margin: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+  }}
+  /* Width is set per picture in views/journal.py, from its aspect ratio, so
+     it fills whichever dimension of the window binds first. */
+  .st-key-lightbox [data-testid="stImage"] img {{
+    display: block;
+    height: auto !important;
+    max-width: none !important;
+    border-radius: 10px;
+    box-shadow: 0 12px 48px rgba(0,0,0,.6);
+  }}
+  .st-key-lightbox [data-testid="stElementToolbar"] {{
+    display: none !important;
+  }}
+  /* Close: on the picture's top-left corner, inset like the ✕ is on the
+     thumbnail, and dark enough to read over any chart. */
+  .st-key-lightbox .st-key-lightbox_close {{
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: auto !important;
+    z-index: 2;
+  }}
+  .st-key-lightbox_close button {{
+    min-height: 0 !important;
+    height: 26px !important;
+    padding: 0 10px !important;
+    font-size: .78rem !important;
+    line-height: 1 !important;
+    background: rgba(0,0,0,.6) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255,255,255,.28) !important;
+    border-radius: 6px !important;
+  }}
+  .st-key-lightbox_close button:hover {{
+    background: rgba(0,0,0,.85) !important;
+    border-color: rgba(255,255,255,.5) !important;
+  }}
 
   /* File uploaders, on the entry form and in the drawer. Streamlit gives the
      dropzone a 68px floor and its button a 40px one, which is a lot of dark

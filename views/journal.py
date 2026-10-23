@@ -7,6 +7,7 @@ from datetime import date
 
 import pandas as pd
 import streamlit as st
+from PIL import Image
 
 from journal import edits, queries as q
 from journal.fields import FieldError, display_date, display_time
@@ -356,6 +357,74 @@ def _terms(conn, trade) -> None:
             st.rerun()
 
 
+ZOOM_KEY = "zoom_shot"
+
+
+def _zoom(trade_id: int, timeframe: str, ordinal: int) -> None:
+    st.session_state[ZOOM_KEY] = (trade_id, timeframe, ordinal)
+
+
+def _unzoom() -> None:
+    st.session_state.pop(ZOOM_KEY, None)
+
+
+def _lightbox(conn, trade_id: int) -> None:
+    """One screenshot, enlarged to nearly fill the window, with Close on its
+    top-left corner -- the ✕ already owns the thumbnail's top-right, and
+    putting the two on the same corner invites removing a picture when the
+    intent was to put it down.
+
+    A Streamlit container restyled as an overlay by theme.py, not a dialog:
+    st.dialog fixes its own width and close button, and neither is what was
+    asked for. It sits outside the drawer's scrolling panel, so it is never
+    clipped by it.
+    """
+    zoom = st.session_state.get(ZOOM_KEY)
+    if not zoom:
+        return
+    if zoom[0] != trade_id:
+        _unzoom()  # left over from another trade's drawer
+        return
+    _, timeframe, ordinal = zoom
+    shot = next((s for s in edits.screenshots(conn, trade_id)[timeframe]
+                 if s["ordinal"] == ordinal), None)
+    path = edits.MEDIA_ROOT / shot["rel_path"] if shot else None
+    if path is None or not path.exists():
+        _unzoom()
+        return
+
+    # The picture has to fill whichever of the window's two dimensions binds
+    # first, which CSS can only work out given the picture's shape. Reading the
+    # size from the file header is cheap -- Pillow does not decode the pixels.
+    with Image.open(path) as image:
+        width, height = image.size
+        source_format = image.format
+    aspect = width / height if height else 1.0
+
+    with st.container(key="lightbox"):
+        st.markdown(
+            "<style>.st-key-lightbox [data-testid=\"stImage\"] img {"
+            f"width: min(94vw, calc(92vh * {aspect:.4f})) !important;"
+            "}</style>",
+            unsafe_allow_html=True,
+        )
+        st.button("Close", key="lightbox_close", on_click=_unzoom)
+        # The picture's own width, passed as a number. Any non-numeric width
+        # makes Streamlit downsample to 1460px before sending it -- which is
+        # fine for a thumbnail and soft on a Retina screen at nearly full
+        # window size, where chart labels are the reason for opening it. A
+        # numeric width at or above the file's own is served untouched; the
+        # displayed size is still set by the CSS above.
+        #
+        # And in the file's own format, so it arrives byte for byte. Left on
+        # "auto", Streamlit re-encodes any PNG without an alpha channel as a
+        # JPEG at quality 90 -- a faint halo round chart text, which is the one
+        # thing this view is for reading. WEBP, the only other upload type, is
+        # converted losslessly to PNG.
+        st.image(str(path), width=width,
+                 output_format="JPEG" if source_format == "JPEG" else "PNG")
+
+
 def _drawer(conn, trade_id: int) -> None:
     trade = conn.execute("SELECT * FROM v_trade WHERE id = ?", (trade_id,)).fetchone()
     if trade is None:
@@ -411,6 +480,15 @@ def _drawer(conn, trade_id: int) -> None:
                 with st.container(key=f"shot_{timeframe}_{shot['ordinal']}_{trade_id}"):
                     if path.exists():
                         st.image(str(path), width="stretch")
+                        # The whole picture is the click target: theme.py lays
+                        # this button over it, transparent, beneath the ✕. A
+                        # callback rather than the return value, so the
+                        # overlay draws on the same rerun as the click instead
+                        # of needing a second one.
+                        st.button("Expand screenshot",
+                                  key=f"zoom_{timeframe}_{shot['ordinal']}_{trade_id}",
+                                  on_click=_zoom,
+                                  args=(trade_id, timeframe, shot["ordinal"]))
                     else:
                         st.caption("Image file missing from disk.")
                     if st.button("✕", key=f"rm_{timeframe}_{shot['ordinal']}_{trade_id}",
@@ -457,3 +535,4 @@ def _drawer(conn, trade_id: int) -> None:
     # taking the confirm click with it.
     if st.session_state.get("pending_delete") == trade_id:
         _confirm_delete(conn, trade)
+    _lightbox(conn, trade_id)

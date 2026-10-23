@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 FLAG_THRESHOLD = 20
 
@@ -93,12 +93,17 @@ DOW_NAMES = ("Sunday", "Monday", "Tuesday", "Wednesday",
              "Thursday", "Friday", "Saturday")
 
 # Shared by every aggregate below. Both win rates, always, each with its own n.
+# SUM over zero rows is NULL, not 0 -- so every count here is wrapped. An empty
+# range is a real state the dashboard renders (the tiles stay up and go blank),
+# and "no trades" means zero wins, not an unknown number of them. The averages
+# and ratios below are deliberately left NULL: with nothing to average, they are
+# genuinely undefined, and the display layer renders that as a dash.
 _METRICS = """
     COUNT(*)                                                          AS n_all,
-    SUM(outcome='win')                                                AS n_wins,
-    SUM(outcome='loss')                                               AS n_losses,
-    SUM(outcome='breakeven')                                          AS n_be,
-    SUM(outcome IN ('win','loss'))                                    AS n_decided,
+    COALESCE(SUM(outcome='win'), 0)                                   AS n_wins,
+    COALESCE(SUM(outcome='loss'), 0)                                  AS n_losses,
+    COALESCE(SUM(outcome='breakeven'), 0)                             AS n_be,
+    COALESCE(SUM(outcome IN ('win','loss')), 0)                       AS n_decided,
     1.0*SUM(outcome='win') / NULLIF(SUM(outcome IN ('win','loss')),0) AS win_rate_excl_be,
     1.0*SUM(outcome='win') / COUNT(*)                                 AS win_rate_incl_be,
     AVG(r)                                                            AS expectancy_incl_be,
@@ -106,8 +111,8 @@ _METRICS = """
     AVG(CASE WHEN outcome='win' THEN planned_rr END)                  AS avg_winner_r,
     AVG(planned_rr)                                                   AS avg_planned_rr,
     1.0*SUM(outcome='breakeven') / COUNT(*)                           AS be_rate,
-    SUM(CASE WHEN r > 0 THEN r ELSE 0 END)                            AS gross_profit_r,
-    SUM(CASE WHEN r < 0 THEN -r ELSE 0 END)                           AS gross_loss_r,
+    COALESCE(SUM(CASE WHEN r > 0 THEN r ELSE 0 END), 0)               AS gross_profit_r,
+    COALESCE(SUM(CASE WHEN r < 0 THEN -r ELSE 0 END), 0)              AS gross_loss_r,
     SUM(CASE WHEN r > 0 THEN r ELSE 0 END)
       / NULLIF(SUM(CASE WHEN r < 0 THEN -r ELSE 0 END), 0)            AS profit_factor
 """
@@ -168,35 +173,50 @@ def format_scope(scope: Scope) -> str:
 
 
 ALL_TIME = "All time"
+LAST_MONTH = "Last month"
 CURRENT_MONTH = "Current month"
-DATE_RANGES = [ALL_TIME, "1Y", "YTD", CURRENT_MONTH]
+DATE_RANGES = [ALL_TIME, "1Y", "YTD", LAST_MONTH, CURRENT_MONTH]
 
 
-def range_floor(label: str, today: date | None = None) -> str | None:
-    """Earliest trade_date included by a range label, or None for all time.
+def range_window(label: str, today: date | None = None) -> tuple[str | None, str | None]:
+    """(earliest, latest) trade_date a range label includes; None is open.
 
     Cuts on trade_date -- the market session date -- not on when the row was
     written, so "this month" means trades taken this month.
+
+    Last month is the previous calendar month and is the only range closed at
+    the top, which is why this returns a pair rather than a floor. Every other
+    range runs to today and would happily include a trade dated tomorrow, so an
+    open ceiling is right for them. Both ends are inclusive.
     """
     today = today or date.today()
+    first_of_month = today.replace(day=1)
     if label == CURRENT_MONTH:
-        return today.replace(day=1).isoformat()
+        return first_of_month.isoformat(), None
+    if label == LAST_MONTH:
+        # The day before the 1st is the last day of the previous month, which
+        # sidesteps month lengths and the year boundary in one step.
+        last = first_of_month - timedelta(days=1)
+        return last.replace(day=1).isoformat(), last.isoformat()
     if label == "YTD":
-        return date(today.year, 1, 1).isoformat()
+        return date(today.year, 1, 1).isoformat(), None
     if label == "1Y":
         try:
-            return today.replace(year=today.year - 1).isoformat()
+            return today.replace(year=today.year - 1).isoformat(), None
         except ValueError:          # 29 Feb in a non-leap year
-            return today.replace(year=today.year - 1, day=28).isoformat()
-    return None
+            return today.replace(year=today.year - 1, day=28).isoformat(), None
+    return None, None
 
 
 def headline(conn: sqlite3.Connection, scope: Scope,
-             since: str | None = None) -> sqlite3.Row:
+             since: str | None = None, until: str | None = None) -> sqlite3.Row:
     clause, params = scope.where()
     if since:
         clause += " AND trade_date >= ?"
         params = params + [since]
+    if until:
+        clause += " AND trade_date <= ?"
+        params = params + [until]
     return conn.execute(
         f"SELECT {_METRICS} FROM v_trade WHERE {clause}", params
     ).fetchone()

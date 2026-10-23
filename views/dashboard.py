@@ -58,27 +58,36 @@ def render() -> None:
             "Date range", q.DATE_RANGES, default=q.ALL_TIME, required=True,
             key="date_range", label_visibility="collapsed",
         ) or q.ALL_TIME
-    since = q.range_floor(date_range, today.date())
+    since, until = q.range_window(date_range, today.date())
 
-    head = q.headline(conn, scope, since=since)
+    head = q.headline(conn, scope, since=since, until=until)
 
-    # An empty range takes out the figures, not the page. Returning here used
-    # to blank the calendar too -- so picking Current month before the first
-    # trade of the month left nothing on screen, including the day grid that
-    # would have shown the trade once it was logged.
+    # The calendar keeps its own month navigation, because most ranges span
+    # many months and none of them name one. The two that do name a month move
+    # it, so the grid and the figures describe the same weeks. Snapping only as
+    # the selection changes leaves the arrows usable afterwards: pick Last
+    # month, then page back through the year from there.
+    focus = _focus_month(date_range, today.date())
+    if st.session_state.get("range_seen") != date_range:
+        st.session_state["range_seen"] = date_range
+        if focus:
+            st.session_state[f"cal_month_{scope.key}"] = focus
+
+    # An empty range empties the figures, it does not remove them. The tiles,
+    # At a glance and Recent Trades all stay where they are and go blank, so a
+    # month with nothing in it yet reads as a month with nothing in it yet --
+    # not as a broken page. The banner says so, above the tiles it explains.
     if head["n_all"] == 0:
         st.info(
             f"No {scope.label.lower()} trades in this range"
             f"{'' if date_range == q.ALL_TIME else f' ({date_range.lower()})'}."
         )
-        _calendar(conn, scope)
-        return
 
     pf_value, pf_help = profit_factor_display(head)
     # The one figure on the page that is not about live trading. Same date
     # range as everything else, different scope -- so it is labelled by scope
     # rather than by denominator alone, and the live tiles are too.
-    tested = q.headline(conn, q.Scope(BACKTEST_SCOPE), since=since)
+    tested = q.headline(conn, q.Scope(BACKTEST_SCOPE), since=since, until=until)
 
     # No sample-size markers on this page: it is a status board, not an
     # analysis surface. The <20 flagging still applies on the Analytics tab,
@@ -162,16 +171,33 @@ def render() -> None:
                          height=table_height(len(recent)))
 
     with right:
-        _calendar(conn, scope)
+        _calendar(conn, scope, focus)
 
 
-def _calendar(conn, scope) -> None:
+def _focus_month(date_range: str, today: date) -> str | None:
+    """The YYYY-MM a range names, or None if it does not name one.
+
+    Only the two single-month ranges do. All time, 1Y and YTD each span many
+    months, so there is no one month for the calendar to show, and it keeps
+    whatever it was on.
+    """
+    if date_range not in (q.LAST_MONTH, q.CURRENT_MONTH):
+        return None
+    since, _ = q.range_window(date_range, today)
+    return since[:7]
+
+
+def _calendar(conn, scope, focus: str | None = None) -> None:
     # The current month is always reachable and is where the calendar opens,
     # even before anything has been traded in it. An empty grid is the honest
     # answer to "how has this month gone"; opening on the last month that
     # happened to contain a trade reads as stale.
     this_month = f"{date.today():%Y-%m}"
-    months = sorted(set(q.months_with_trades(conn, scope)) | {this_month})
+    # The focused month joins the list even when nothing was traded in it --
+    # otherwise selecting a range for a quiet month would fail the membership
+    # check below and bounce the calendar back to today.
+    months = sorted(set(q.months_with_trades(conn, scope))
+                    | {this_month} | ({focus} if focus else set()))
 
     state_key = f"cal_month_{scope.key}"
     if state_key not in st.session_state or st.session_state[state_key] not in months:
